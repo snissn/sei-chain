@@ -644,6 +644,7 @@ func produceTxs(ctx context.Context, client *tmlocal.Local, opts options) (int64
 	defer cancel()
 
 	var nextID atomic.Int64
+	var reserved atomic.Int64
 	var attempts atomic.Int64
 	var accepted atomic.Int64
 	var errorsCount atomic.Int64
@@ -653,13 +654,16 @@ func produceTxs(ctx context.Context, client *tmlocal.Local, opts options) (int64
 		go func(worker int) {
 			defer wg.Done()
 			for {
-				if opts.maxTxs > 0 && accepted.Load() >= opts.maxTxs {
-					return
-				}
 				select {
 				case <-ctx.Done():
 					return
 				default:
+				}
+				if opts.maxTxs > 0 {
+					if reserved.Add(1) > opts.maxTxs {
+						reserved.Add(-1)
+						return
+					}
 				}
 				id := nextID.Add(1)
 				tx := makeTx(id, worker, opts)
@@ -667,10 +671,16 @@ func produceTxs(ctx context.Context, client *tmlocal.Local, opts options) (int64
 				res, err := client.BroadcastTxSync(ctx, tx)
 				if err != nil {
 					errorsCount.Add(1)
+					if opts.maxTxs > 0 {
+						reserved.Add(-1)
+					}
 					continue
 				}
 				if res.Code != 0 {
 					errorsCount.Add(1)
+					if opts.maxTxs > 0 {
+						reserved.Add(-1)
+					}
 					continue
 				}
 				accepted.Add(1)
