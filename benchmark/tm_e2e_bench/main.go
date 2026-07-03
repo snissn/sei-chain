@@ -254,6 +254,11 @@ func run(ctx context.Context, opts options) error {
 	if opts.waitTargetTxs < 0 {
 		return fmt.Errorf("wait-target-txs must be >= 0")
 	}
+	outDir, err := safeOutputDir(opts.outDir)
+	if err != nil {
+		return err
+	}
+	opts.outDir = outDir
 	if err := os.RemoveAll(opts.outDir); err != nil {
 		return err
 	}
@@ -285,6 +290,38 @@ func run(ctx context.Context, opts options) error {
 		return err
 	}
 	return nil
+}
+
+func safeOutputDir(path string) (string, error) {
+	if strings.TrimSpace(path) == "" {
+		return "", fmt.Errorf("output directory must not be empty")
+	}
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return "", err
+	}
+	clean := filepath.Clean(abs)
+
+	if clean == string(filepath.Separator) {
+		return "", fmt.Errorf("refusing unsafe output directory %q", path)
+	}
+	if cwd, err := os.Getwd(); err == nil && sameOrParent(clean, filepath.Clean(cwd)) {
+		return "", fmt.Errorf("refusing unsafe output directory %q", path)
+	}
+	if home, err := os.UserHomeDir(); err == nil {
+		if clean == filepath.Clean(home) {
+			return "", fmt.Errorf("refusing unsafe output directory %q", path)
+		}
+	}
+	return clean, nil
+}
+
+func sameOrParent(parent string, child string) bool {
+	rel, err := filepath.Rel(parent, child)
+	if err != nil {
+		return false
+	}
+	return rel == "." || rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
 }
 
 func runBackend(ctx context.Context, opts options, backend string) (benchResult, error) {
@@ -447,7 +484,7 @@ func runBackend(ctx context.Context, opts options, backend string) (benchResult,
 	startHeight := startStatus.SyncInfo.LatestBlockHeight
 
 	loadStart := time.Now()
-	attempts, accepted, errorsCount := produceTxs(ctx, client, opts, loadStart)
+	attempts, accepted, errorsCount := produceTxs(ctx, client, opts)
 	loadElapsed := time.Since(loadStart)
 	if opts.settle > 0 {
 		time.Sleep(opts.settle)
@@ -602,7 +639,7 @@ type blockStats struct {
 	p95BlockBytes   int
 }
 
-func produceTxs(ctx context.Context, client *tmlocal.Local, opts options, started time.Time) (int64, int64, int64) {
+func produceTxs(ctx context.Context, client *tmlocal.Local, opts options) (int64, int64, int64) {
 	ctx, cancel := context.WithTimeout(ctx, opts.duration)
 	defer cancel()
 
@@ -641,7 +678,6 @@ func produceTxs(ctx context.Context, client *tmlocal.Local, opts options, starte
 		}(worker)
 	}
 	wg.Wait()
-	_ = started
 	return attempts.Load(), accepted.Load(), errorsCount.Load()
 }
 
@@ -878,6 +914,7 @@ func runReadPhase(ctx context.Context, client *tmlocal.Local, opts options, star
 	var next atomic.Int64
 	var errorsCount atomic.Int64
 	var firstErr atomic.Value
+	firstErr.Store("")
 	var firstErrOnce sync.Once
 	var latencies []time.Duration
 	if opts.readSampleRate > 0 {
