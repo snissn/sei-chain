@@ -101,6 +101,29 @@ func TestBackendProfileArtifacts(t *testing.T) {
 	}
 }
 
+func TestParseBackendsRejectsPathUnsafeNames(t *testing.T) {
+	backends, err := parseBackends(" goleveldb, treedb ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := strings.Join(backends, ","), "goleveldb,treedb"; got != want {
+		t.Fatalf("unexpected backends %q, want %q", got, want)
+	}
+
+	for _, raw := range []string{
+		"../treedb",
+		"..",
+		"/tmp/treedb",
+		`treedb\escape`,
+		"goleveldb,../../escape",
+		" ",
+	} {
+		if _, err := parseBackends(raw); err == nil {
+			t.Fatalf("expected %q to be rejected", raw)
+		}
+	}
+}
+
 func readFileString(t *testing.T, path string) string {
 	t.Helper()
 	data, err := os.ReadFile(path)

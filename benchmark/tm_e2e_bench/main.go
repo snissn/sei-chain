@@ -302,6 +302,10 @@ func run(ctx context.Context, opts options) error {
 	if opts.waitTargetTxs < 0 {
 		return fmt.Errorf("wait-target-txs must be >= 0")
 	}
+	backends, err := parseBackends(opts.backends)
+	if err != nil {
+		return err
+	}
 	outDir, err := safeOutputDir(opts.outDir)
 	if err != nil {
 		return err
@@ -314,13 +318,8 @@ func run(ctx context.Context, opts options) error {
 		return err
 	}
 
-	backends := strings.Split(opts.backends, ",")
 	var results []benchResult
 	for _, backend := range backends {
-		backend = strings.TrimSpace(backend)
-		if backend == "" {
-			continue
-		}
 		result, err := runBackendWithProfiles(ctx, opts, backend)
 		if err != nil {
 			return fmt.Errorf("%s: %w", backend, err)
@@ -336,6 +335,34 @@ func run(ctx context.Context, opts options) error {
 	}
 	if err := writeSummary(filepath.Join(opts.outDir, "summary.txt"), results); err != nil {
 		return err
+	}
+	return nil
+}
+
+func parseBackends(raw string) ([]string, error) {
+	var backends []string
+	for _, backend := range strings.Split(raw, ",") {
+		backend = strings.TrimSpace(backend)
+		if backend == "" {
+			continue
+		}
+		if err := validateBackendName(backend); err != nil {
+			return nil, err
+		}
+		backends = append(backends, backend)
+	}
+	if len(backends) == 0 {
+		return nil, fmt.Errorf("at least one backend must be provided")
+	}
+	return backends, nil
+}
+
+func validateBackendName(backend string) error {
+	if backend == "." || backend == ".." ||
+		filepath.IsAbs(backend) ||
+		filepath.Clean(backend) != backend ||
+		strings.ContainsAny(backend, `/\`) {
+		return fmt.Errorf("backend %q must be a path-safe name", backend)
 	}
 	return nil
 }
