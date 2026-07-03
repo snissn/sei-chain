@@ -853,6 +853,12 @@ func TestTxMempool_ReapTxs_EVMFirst(t *testing.T) {
 	// Reap all transactions
 	reapedTxs, _ := txmp.ReapTxs(ReapLimits{}, false)
 	require.Len(t, reapedTxs, 5)
+	reapedTxsWithHashes, reapedHashes, _ := txmp.ReapTxsWithHashes(ReapLimits{}, false)
+	require.Equal(t, reapedTxs, reapedTxsWithHashes)
+	require.Len(t, reapedHashes, len(reapedTxsWithHashes))
+	for i, tx := range reapedTxsWithHashes {
+		require.Equal(t, tx.Hash(), reapedHashes[i])
+	}
 
 	// Verify EVM transactions come first, then non-EVM
 	// Find the boundary between EVM and non-EVM transactions
@@ -883,6 +889,27 @@ func TestTxMempool_ReapTxs_EVMFirst(t *testing.T) {
 	// Verify the last 2 transactions are non-EVM
 	require.True(t, strings.HasPrefix(string(reapedTxs[3]), "sender"), "Fourth tx should be non-EVM: %s", string(reapedTxs[3]))
 	require.True(t, strings.HasPrefix(string(reapedTxs[4]), "sender"), "Fifth tx should be non-EVM: %s", string(reapedTxs[4]))
+}
+
+func TestTxMempool_CheckTxClonesSubmittedBytes(t *testing.T) {
+	ctx := t.Context()
+
+	client := &application{Application: kvstore.NewApplication()}
+	cfg := TestConfig()
+	cfg.CacheSize = 0
+	txmp := setup(cfg, proxy.New(client, proxy.NopMetrics()), NopTxConstraintsFetcher)
+
+	original := types.Tx("sender=key=100")
+	tx := append(types.Tx(nil), original...)
+	_, err := txmp.CheckTx(ctx, tx)
+	require.NoError(t, err)
+
+	copy(tx, "sender=key=001")
+
+	reapedTxs, reapedHashes, _ := txmp.ReapTxsWithHashes(ReapLimits{}, false)
+	require.Equal(t, types.Txs{original}, reapedTxs)
+	require.Equal(t, []types.TxHash{original.Hash()}, reapedHashes)
+	require.Equal(t, reapedTxs[0].Hash(), reapedHashes[0])
 }
 
 func TestBlockFailedTxNotReAdmittedAfterSecondFailure(t *testing.T) {

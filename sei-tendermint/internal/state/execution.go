@@ -123,12 +123,12 @@ func (blockExec *BlockExecutor) CreateProposalBlock(
 	// Fetch a limited amount of valid txs
 	maxDataBytes := types.MaxDataBytes(maxBytes, evSize, state.Validators.Size())
 
-	txs, _ := blockExec.mempool.ReapTxs(mempool.ReapLimits{
+	txs, txHashes, _ := blockExec.mempool.ReapTxsWithHashes(mempool.ReapLimits{
 		MaxBytes:        utils.Some(maxDataBytes),
 		MaxGasWanted:    utils.Some(maxGasWanted),
 		MaxGasEstimated: utils.Some(maxGas),
 	}, false)
-	block = state.MakeBlock(height, txs, lastCommit, evidence, proposerAddr)
+	block = state.MakeBlockWithTxHashes(height, txs, txHashes, lastCommit, evidence, proposerAddr)
 	return block, nil
 }
 
@@ -685,15 +685,15 @@ func FireEvents(
 			len(block.Txs), len(finalizeBlockResponse.TxResults)))
 	}
 
+	txHashes := block.GetTxHashes()
 	for i, tx := range block.Txs {
-		if err := eventBus.PublishEventTx(types.EventDataTx{
-			TxResultV2: abci.TxResultV2{
-				Height: block.Height,
-				Index:  uint32(i), //nolint:gosec // i is bounded by block.Txs length which fits in uint32
-				Tx:     tx,
-				Result: *(finalizeBlockResponse.TxResults[i]),
-			},
-		}); err != nil {
+		txResult := abci.TxResultV2{
+			Height: block.Height,
+			Index:  uint32(i), //nolint:gosec // i is bounded by block.Txs length which fits in uint32
+			Tx:     tx,
+			Result: *(finalizeBlockResponse.TxResults[i]),
+		}
+		if err := eventBus.PublishEventTx(types.NewEventDataTxWithHash(txResult, txHashes[i])); err != nil {
 			logger.Error("failed publishing event TX", "err", err)
 		}
 	}

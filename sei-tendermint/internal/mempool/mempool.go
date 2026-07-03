@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -297,6 +298,7 @@ func (txmp *TxMempool) CheckTx(ctx context.Context, tx types.Tx) (*abci.Response
 	if txSize := len(tx); txSize > txmp.config.MaxTxBytes {
 		return nil, fmt.Errorf("%w: max size is %d, but got %d", ErrTxTooLarge, txmp.config.MaxTxBytes, txSize)
 	}
+	tx = slices.Clone(tx)
 	hTx := newHashedTx(tx)
 
 	// Avoid processing same transaction in parallel.
@@ -427,13 +429,20 @@ func (txmp *TxMempool) Flush() {
 // NOTE: Transactions are removed from the mempool iff remove == true.
 // Either way, the transactions stay in the LRU cache.
 func (txmp *TxMempool) ReapTxs(limits ReapLimits, remove bool) (types.Txs, int64) {
-	txs, gasEstimate := txmp.txStore.Reap(limits, remove)
+	txs, _, gasEstimate := txmp.ReapTxsWithHashes(limits, remove)
+	return txs, gasEstimate
+}
+
+// ReapTxsWithHashes returns reaped transactions together with ordered hashes
+// matching the returned transaction order.
+func (txmp *TxMempool) ReapTxsWithHashes(limits ReapLimits, remove bool) (types.Txs, []types.TxHash, int64) {
+	txs, txHashes, gasEstimate := txmp.txStore.ReapWithHashes(limits, remove)
 	if remove {
 		txmp.metrics.Size.Set(float64(txmp.NumTxsNotPending()))
 		txmp.metrics.PendingSize.Set(float64(txmp.PendingSize()))
 		txmp.metrics.TotalTxsSizeBytes.Set(float64(txmp.TotalTxsBytesSize()))
 	}
-	return txs, gasEstimate
+	return txs, txHashes, gasEstimate
 }
 
 // Update iterates over all the transactions provided by the block producer,

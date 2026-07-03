@@ -65,12 +65,34 @@ func (txi *TxIndex) Get(hash []byte) (*abci.TxResultV2, error) {
 // respective attribute's key delimited by a "." (eg. "account.number").
 // Any event with an empty type is not indexed.
 func (txi *TxIndex) Index(results []*abci.TxResultV2) error {
+	return txi.index(results, nil, false)
+}
+
+// IndexWithHashes indexes transactions using ordered tx hashes after verifying
+// each supplied hash against its tx bytes. Length mismatches fall back to
+// recomputing.
+func (txi *TxIndex) IndexWithHashes(results []*abci.TxResultV2, txHashes []types.TxHash) error {
+	if len(txHashes) != len(results) {
+		return txi.Index(results)
+	}
+	return txi.index(results, txHashes, true)
+}
+
+// IndexWithVerifiedHashes indexes transactions using ordered tx hashes that
+// the caller already validated against the tx bytes.
+func (txi *TxIndex) IndexWithVerifiedHashes(results []*abci.TxResultV2, txHashes []types.TxHash) error {
+	if len(txHashes) != len(results) {
+		return txi.Index(results)
+	}
+	return txi.index(results, txHashes, false)
+}
+
+func (txi *TxIndex) index(results []*abci.TxResultV2, txHashes []types.TxHash, verifyTxHashes bool) error {
 	b := txi.store.NewBatch()
 	defer func() { _ = b.Close() }()
 
-	for _, result := range results {
-		hash := types.Tx(result.Tx).Hash()
-		hashBytes := hash[:]
+	for i, result := range results {
+		hashBytes := txHashBytes(result, txHashes, i, verifyTxHashes)
 
 		// index tx by events
 		err := txi.indexEvents(result, hashBytes, b)
@@ -96,6 +118,17 @@ func (txi *TxIndex) Index(results []*abci.TxResultV2) error {
 	}
 
 	return b.WriteSync()
+}
+
+func txHashBytes(result *abci.TxResultV2, txHashes []types.TxHash, index int, verifyTxHashes bool) []byte {
+	if len(txHashes) != 0 && !verifyTxHashes {
+		return txHashes[index][:]
+	}
+	hash := types.Tx(result.Tx).Hash()
+	if len(txHashes) == 0 || txHashes[index] != hash {
+		return hash[:]
+	}
+	return txHashes[index][:]
 }
 
 func (txi *TxIndex) indexEvents(result *abci.TxResultV2, hash []byte, store dbm.Batch) error {
