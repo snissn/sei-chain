@@ -64,79 +64,82 @@ type options struct {
 	failOnTimeout    bool
 	cpuProfile       string
 	memProfile       string
+	profileDir       string
 }
 
 type benchResult struct {
-	Backend                string        `json:"backend"`
-	Home                   string        `json:"home"`
-	DBBackend              string        `json:"db_backend"`
-	Indexer                string        `json:"indexer"`
-	DurationSeconds        float64       `json:"duration_seconds"`
-	LoadSeconds            float64       `json:"load_seconds"`
-	WaitSeconds            float64       `json:"wait_seconds"`
-	DrainSeconds           float64       `json:"drain_seconds"`
-	ProducerAttempts       int64         `json:"producer_attempts"`
-	ProducerAccepted       int64         `json:"producer_accepted"`
-	ProducerErrors         int64         `json:"producer_errors"`
-	TimedOut               bool          `json:"timed_out"`
-	WaitError              string        `json:"wait_error,omitempty"`
-	StartHeight            int64         `json:"start_height"`
-	EndHeight              int64         `json:"end_height"`
-	CommittedTxs           int64         `json:"committed_txs"`
-	NonEmptyBlocks         int64         `json:"non_empty_blocks"`
-	BlockCount             int64         `json:"block_count"`
-	AvgCommitTPS           float64       `json:"avg_commit_tps"`
-	DrainTPS               float64       `json:"drain_tps"`
-	AvgBlockTxs            float64       `json:"avg_block_txs"`
-	MaxBlockTxs            int           `json:"max_block_txs"`
-	P50BlockTxs            int           `json:"p50_block_txs"`
-	P95BlockTxs            int           `json:"p95_block_txs"`
-	TotalBlockBytes        int64         `json:"total_block_bytes"`
-	AvgBlockBytes          float64       `json:"avg_block_bytes"`
-	MaxBlockBytes          int           `json:"max_block_bytes"`
-	P50BlockBytes          int           `json:"p50_block_bytes"`
-	P95BlockBytes          int           `json:"p95_block_bytes"`
-	FinalHeight            int64         `json:"final_height"`
-	DataBytes              int64         `json:"data_bytes"`
-	ReadScenario           string        `json:"read_scenario,omitempty"`
-	ReadRequests           int           `json:"read_requests,omitempty"`
-	ReadConcurrency        int           `json:"read_concurrency,omitempty"`
-	ReadBatchSize          int           `json:"read_batch_size,omitempty"`
-	ReadLatencySampleRate  int           `json:"read_latency_sample_rate,omitempty"`
-	ReadLatencySamples     int           `json:"read_latency_samples,omitempty"`
-	ReadHashCandidates     int           `json:"read_hash_candidates,omitempty"`
-	ReadValidationSeconds  float64       `json:"read_validation_seconds,omitempty"`
-	ReadValidationComplete bool          `json:"read_validation_complete"`
-	ReadValidationError    string        `json:"read_validation_error,omitempty"`
-	ReadStartDelaySeconds  float64       `json:"read_start_delay_seconds,omitempty"`
-	ReadSeconds            float64       `json:"read_seconds,omitempty"`
-	ReadRPS                float64       `json:"read_rps,omitempty"`
-	ReadErrors             int64         `json:"read_errors,omitempty"`
-	ReadFirstError         string        `json:"read_first_error,omitempty"`
-	ReadP50Millis          float64       `json:"read_p50_ms,omitempty"`
-	ReadP90Millis          float64       `json:"read_p90_ms,omitempty"`
-	ReadP95Millis          float64       `json:"read_p95_ms,omitempty"`
-	ReadP99Millis          float64       `json:"read_p99_ms,omitempty"`
-	ReadP999Millis         float64       `json:"read_p999_ms,omitempty"`
-	ReadMaxMillis          float64       `json:"read_max_ms,omitempty"`
-	ReadHashCount          int           `json:"read_hash_count,omitempty"`
-	TxPayloadBytes         int           `json:"tx_payload_bytes"`
-	Keyspace               int           `json:"keyspace"`
-	Concurrency            int           `json:"concurrency"`
-	BlockMaxBytes          int64         `json:"block_max_bytes"`
-	MempoolNotifyTxs       uint64        `json:"mempool_notify_txs"`
-	MempoolTTL             time.Duration `json:"mempool_ttl"`
-	ProposeTimeout         time.Duration `json:"propose_timeout"`
-	ProposeDelta           time.Duration `json:"propose_delta"`
-	VoteTimeout            time.Duration `json:"vote_timeout"`
-	VoteDelta              time.Duration `json:"vote_delta"`
-	CommitTimeout          time.Duration `json:"commit_timeout"`
-	BypassCommitWait       bool          `json:"bypass_commit_wait"`
-	TargetDuration         time.Duration `json:"target_duration"`
-	TargetMaxTxs           int64         `json:"target_max_txs"`
-	WaitTargetTxs          int64         `json:"wait_target_txs"`
-	NodeStartSeconds       float64       `json:"node_start_seconds"`
-	FirstHeightWaitSeconds float64       `json:"first_height_wait_seconds"`
+	Backend                string            `json:"backend"`
+	Home                   string            `json:"home"`
+	DBBackend              string            `json:"db_backend"`
+	Indexer                string            `json:"indexer"`
+	DurationSeconds        float64           `json:"duration_seconds"`
+	LoadSeconds            float64           `json:"load_seconds"`
+	WaitSeconds            float64           `json:"wait_seconds"`
+	DrainSeconds           float64           `json:"drain_seconds"`
+	ProducerAttempts       int64             `json:"producer_attempts"`
+	ProducerAccepted       int64             `json:"producer_accepted"`
+	ProducerErrors         int64             `json:"producer_errors"`
+	TimedOut               bool              `json:"timed_out"`
+	WaitError              string            `json:"wait_error,omitempty"`
+	StartHeight            int64             `json:"start_height"`
+	EndHeight              int64             `json:"end_height"`
+	CommittedTxs           int64             `json:"committed_txs"`
+	NonEmptyBlocks         int64             `json:"non_empty_blocks"`
+	BlockCount             int64             `json:"block_count"`
+	AvgCommitTPS           float64           `json:"avg_commit_tps"`
+	DrainTPS               float64           `json:"drain_tps"`
+	AvgBlockTxs            float64           `json:"avg_block_txs"`
+	MaxBlockTxs            int               `json:"max_block_txs"`
+	P50BlockTxs            int               `json:"p50_block_txs"`
+	P95BlockTxs            int               `json:"p95_block_txs"`
+	TotalBlockBytes        int64             `json:"total_block_bytes"`
+	AvgBlockBytes          float64           `json:"avg_block_bytes"`
+	MaxBlockBytes          int               `json:"max_block_bytes"`
+	P50BlockBytes          int               `json:"p50_block_bytes"`
+	P95BlockBytes          int               `json:"p95_block_bytes"`
+	FinalHeight            int64             `json:"final_height"`
+	DataBytes              int64             `json:"data_bytes"`
+	ReadScenario           string            `json:"read_scenario,omitempty"`
+	ReadRequests           int               `json:"read_requests,omitempty"`
+	ReadConcurrency        int               `json:"read_concurrency,omitempty"`
+	ReadBatchSize          int               `json:"read_batch_size,omitempty"`
+	ReadLatencySampleRate  int               `json:"read_latency_sample_rate,omitempty"`
+	ReadLatencySamples     int               `json:"read_latency_samples,omitempty"`
+	ReadHashCandidates     int               `json:"read_hash_candidates,omitempty"`
+	ReadValidationSeconds  float64           `json:"read_validation_seconds,omitempty"`
+	ReadValidationComplete bool              `json:"read_validation_complete"`
+	ReadValidationError    string            `json:"read_validation_error,omitempty"`
+	ReadStartDelaySeconds  float64           `json:"read_start_delay_seconds,omitempty"`
+	ReadSeconds            float64           `json:"read_seconds,omitempty"`
+	ReadRPS                float64           `json:"read_rps,omitempty"`
+	ReadErrors             int64             `json:"read_errors,omitempty"`
+	ReadFirstError         string            `json:"read_first_error,omitempty"`
+	ReadP50Millis          float64           `json:"read_p50_ms,omitempty"`
+	ReadP90Millis          float64           `json:"read_p90_ms,omitempty"`
+	ReadP95Millis          float64           `json:"read_p95_ms,omitempty"`
+	ReadP99Millis          float64           `json:"read_p99_ms,omitempty"`
+	ReadP999Millis         float64           `json:"read_p999_ms,omitempty"`
+	ReadMaxMillis          float64           `json:"read_max_ms,omitempty"`
+	ReadHashCount          int               `json:"read_hash_count,omitempty"`
+	TxPayloadBytes         int               `json:"tx_payload_bytes"`
+	Keyspace               int               `json:"keyspace"`
+	Concurrency            int               `json:"concurrency"`
+	BlockMaxBytes          int64             `json:"block_max_bytes"`
+	MempoolNotifyTxs       uint64            `json:"mempool_notify_txs"`
+	MempoolTTL             time.Duration     `json:"mempool_ttl"`
+	ProposeTimeout         time.Duration     `json:"propose_timeout"`
+	ProposeDelta           time.Duration     `json:"propose_delta"`
+	VoteTimeout            time.Duration     `json:"vote_timeout"`
+	VoteDelta              time.Duration     `json:"vote_delta"`
+	CommitTimeout          time.Duration     `json:"commit_timeout"`
+	BypassCommitWait       bool              `json:"bypass_commit_wait"`
+	TargetDuration         time.Duration     `json:"target_duration"`
+	TargetMaxTxs           int64             `json:"target_max_txs"`
+	WaitTargetTxs          int64             `json:"wait_target_txs"`
+	NodeStartSeconds       float64           `json:"node_start_seconds"`
+	FirstHeightWaitSeconds float64           `json:"first_height_wait_seconds"`
+	PhaseTimings           phaseTimings      `json:"phase_timings"`
+	ProfileArtifacts       *profileArtifacts `json:"profile_artifacts,omitempty"`
 }
 
 type readResult struct {
@@ -146,6 +149,28 @@ type readResult struct {
 	seconds        float64
 	latencySamples int
 	latency        []time.Duration
+}
+
+type phaseTimings struct {
+	BackendSeconds           float64 `json:"backend_seconds"`
+	NodeStartSeconds         float64 `json:"node_start_seconds"`
+	FirstHeightWaitSeconds   float64 `json:"first_height_wait_seconds"`
+	LoadSeconds              float64 `json:"load_seconds"`
+	SettleSeconds            float64 `json:"settle_seconds"`
+	WaitForCommitSeconds     float64 `json:"wait_for_commit_seconds"`
+	CollectBlockStatsSeconds float64 `json:"collect_block_stats_seconds"`
+	CollectTxHashesSeconds   float64 `json:"collect_tx_hashes_seconds,omitempty"`
+	TxIndexReadinessSeconds  float64 `json:"tx_index_readiness_seconds,omitempty"`
+	ReadStartDelaySeconds    float64 `json:"read_start_delay_seconds,omitempty"`
+	ReadSeconds              float64 `json:"read_seconds,omitempty"`
+	DirSizeSeconds           float64 `json:"dir_size_seconds"`
+}
+
+type profileArtifacts struct {
+	Scope        string `json:"scope"`
+	CPUProfile   string `json:"cpu_profile,omitempty"`
+	HeapProfile  string `json:"heap_profile,omitempty"`
+	DiffBaseHint string `json:"diff_base_hint,omitempty"`
 }
 
 func main() {
@@ -185,6 +210,7 @@ func main() {
 	flag.BoolVar(&opts.failOnTimeout, "fail-on-timeout", false, "return an error if accepted txs do not fully commit by wait-timeout")
 	flag.StringVar(&opts.cpuProfile, "cpuprofile", "", "write CPU profile to file")
 	flag.StringVar(&opts.memProfile, "memprofile", "", "write heap profile to file after the run")
+	flag.StringVar(&opts.profileDir, "profile-dir", "", "write per-backend CPU and heap profiles to this directory")
 	flag.Parse()
 
 	outDir, err := safeOutputDir(opts.outDir)
@@ -195,6 +221,10 @@ func main() {
 	opts.outDir = outDir
 	if err := validateCPUProfilePath(opts.cpuProfile, opts.outDir); err != nil {
 		fmt.Fprintf(os.Stderr, "tm_e2e_bench: %v\n", err)
+		os.Exit(1)
+	}
+	if opts.profileDir != "" && (opts.cpuProfile != "" || opts.memProfile != "") {
+		fmt.Fprintln(os.Stderr, "tm_e2e_bench: -profile-dir cannot be combined with -cpuprofile or -memprofile")
 		os.Exit(1)
 	}
 
@@ -259,11 +289,22 @@ func run(ctx context.Context, opts options) error {
 	if opts.readStartDelay < 0 {
 		return fmt.Errorf("read-start-delay must be >= 0")
 	}
+	if opts.profileDir != "" {
+		profileDir, err := filepath.Abs(opts.profileDir)
+		if err != nil {
+			return err
+		}
+		opts.profileDir = filepath.Clean(profileDir)
+	}
 	if opts.indexer != "kv" && opts.indexer != "null" {
 		return fmt.Errorf("indexer must be kv or null")
 	}
 	if opts.waitTargetTxs < 0 {
 		return fmt.Errorf("wait-target-txs must be >= 0")
+	}
+	backends, err := parseBackends(opts.backends)
+	if err != nil {
+		return err
 	}
 	outDir, err := safeOutputDir(opts.outDir)
 	if err != nil {
@@ -277,14 +318,9 @@ func run(ctx context.Context, opts options) error {
 		return err
 	}
 
-	backends := strings.Split(opts.backends, ",")
 	var results []benchResult
 	for _, backend := range backends {
-		backend = strings.TrimSpace(backend)
-		if backend == "" {
-			continue
-		}
-		result, err := runBackend(ctx, opts, backend)
+		result, err := runBackendWithProfiles(ctx, opts, backend)
 		if err != nil {
 			return fmt.Errorf("%s: %w", backend, err)
 		}
@@ -299,6 +335,34 @@ func run(ctx context.Context, opts options) error {
 	}
 	if err := writeSummary(filepath.Join(opts.outDir, "summary.txt"), results); err != nil {
 		return err
+	}
+	return nil
+}
+
+func parseBackends(raw string) ([]string, error) {
+	var backends []string
+	for _, backend := range strings.Split(raw, ",") {
+		backend = strings.TrimSpace(backend)
+		if backend == "" {
+			continue
+		}
+		if err := validateBackendName(backend); err != nil {
+			return nil, err
+		}
+		backends = append(backends, backend)
+	}
+	if len(backends) == 0 {
+		return nil, fmt.Errorf("at least one backend must be provided")
+	}
+	return backends, nil
+}
+
+func validateBackendName(backend string) error {
+	if backend == "." || backend == ".." ||
+		filepath.IsAbs(backend) ||
+		filepath.Clean(backend) != backend ||
+		strings.ContainsAny(backend, `/\`) {
+		return fmt.Errorf("backend %q must be a path-safe name", backend)
 	}
 	return nil
 }
@@ -350,7 +414,57 @@ func sameOrParent(parent string, child string) bool {
 	return rel == "." || rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
 }
 
-func runBackend(ctx context.Context, opts options, backend string) (benchResult, error) {
+func runBackendWithProfiles(ctx context.Context, opts options, backend string) (benchResult, error) {
+	artifacts, stopCPU, err := startBackendCPUProfile(opts.profileDir, backend)
+	if err != nil {
+		return benchResult{}, err
+	}
+	result, runErr := runBackend(ctx, opts, backend, artifacts)
+	if stopCPU != nil {
+		if err := stopCPU(); err != nil && runErr == nil {
+			runErr = err
+		}
+	}
+	if runErr != nil {
+		return benchResult{}, runErr
+	}
+	return result, nil
+}
+
+func startBackendCPUProfile(profileDir, backend string) (*profileArtifacts, func() error, error) {
+	if profileDir == "" {
+		return nil, nil, nil
+	}
+	artifacts := backendProfileArtifacts(profileDir, backend)
+	if err := os.MkdirAll(filepath.Dir(artifacts.CPUProfile), 0755); err != nil {
+		return nil, nil, err
+	}
+	f, err := os.Create(artifacts.CPUProfile)
+	if err != nil {
+		return nil, nil, err
+	}
+	if err := pprof.StartCPUProfile(f); err != nil {
+		_ = f.Close()
+		return nil, nil, err
+	}
+	return artifacts, func() error {
+		pprof.StopCPUProfile()
+		return f.Close()
+	}, nil
+}
+
+func backendProfileArtifacts(profileDir, backend string) *profileArtifacts {
+	prefix := filepath.Join(profileDir, backend)
+	return &profileArtifacts{
+		Scope:        "backend",
+		CPUProfile:   prefix + ".cpu.pprof",
+		HeapProfile:  prefix + ".heap.pprof",
+		DiffBaseHint: "go tool pprof -top -diff_base <baseline>.cpu.pprof <candidate>.cpu.pprof",
+	}
+}
+
+func runBackend(ctx context.Context, opts options, backend string, artifacts *profileArtifacts) (benchResult, error) {
+	backendStart := time.Now()
 	home := filepath.Join(opts.outDir, backend, "home")
 	if err := os.MkdirAll(filepath.Join(home, "config"), 0755); err != nil {
 		return benchResult{}, err
@@ -514,8 +628,11 @@ func runBackend(ctx context.Context, opts options, backend string) (benchResult,
 	loadStart := time.Now()
 	attempts, accepted, errorsCount := produceTxs(ctx, client, opts)
 	loadElapsed := time.Since(loadStart)
+	settleElapsed := time.Duration(0)
 	if opts.settle > 0 {
+		settleStart := time.Now()
 		time.Sleep(opts.settle)
+		settleElapsed = time.Since(settleStart)
 	}
 
 	waitTarget := accepted
@@ -534,21 +651,27 @@ func runBackend(ctx context.Context, opts options, backend string) (benchResult,
 		return benchResult{}, err
 	}
 	endHeight := endStatus.SyncInfo.LatestBlockHeight
+	collectBlockStatsStart := time.Now()
 	blockStats, err := collectBlockStats(ctx, client, startHeight+1, endHeight)
 	if err != nil {
 		return benchResult{}, err
 	}
+	collectBlockStatsElapsed := time.Since(collectBlockStatsStart)
 
 	var rr readResult
 	var readHashes []tmbytes.HexBytes
 	var readHashCandidates int
 	var readValidation readableTxHashesResult
+	var collectTxHashesElapsed time.Duration
+	var readStartDelayElapsed time.Duration
 	if opts.readRequests > 0 {
 		if opts.readScenario == "tx" {
+			collectTxHashesStart := time.Now()
 			readHashes, err = collectTxHashes(ctx, client, startHeight+1, endHeight, opts.readRequests)
 			if err != nil {
 				return benchResult{}, err
 			}
+			collectTxHashesElapsed = time.Since(collectTxHashesStart)
 			readHashCandidates = len(readHashes)
 			if opts.readValidate {
 				readValidation, err = waitForReadableTxHashes(ctx, client, readHashes, opts.readIndexWait, opts.readIndexPoll)
@@ -563,14 +686,32 @@ func runBackend(ctx context.Context, opts options, backend string) (benchResult,
 			}
 		}
 		if opts.readStartDelay > 0 {
+			readStartDelayStart := time.Now()
 			time.Sleep(opts.readStartDelay)
+			readStartDelayElapsed = time.Since(readStartDelayStart)
 		}
 		rr = runReadPhase(ctx, client, opts, startHeight+1, endHeight, readHashes)
 	}
 
+	dirSizeStart := time.Now()
 	dataBytes, err := dirSize(filepath.Join(home, "data"))
 	if err != nil {
 		return benchResult{}, err
+	}
+	dirSizeElapsed := time.Since(dirSizeStart)
+	phases := phaseTimings{
+		BackendSeconds:           time.Since(backendStart).Seconds(),
+		NodeStartSeconds:         nodeStartSeconds,
+		FirstHeightWaitSeconds:   firstHeightWaitSeconds,
+		LoadSeconds:              loadElapsed.Seconds(),
+		SettleSeconds:            settleElapsed.Seconds(),
+		WaitForCommitSeconds:     waitElapsed.Seconds(),
+		CollectBlockStatsSeconds: collectBlockStatsElapsed.Seconds(),
+		CollectTxHashesSeconds:   collectTxHashesElapsed.Seconds(),
+		TxIndexReadinessSeconds:  readValidation.seconds,
+		ReadStartDelaySeconds:    readStartDelayElapsed.Seconds(),
+		ReadSeconds:              rr.seconds,
+		DirSizeSeconds:           dirSizeElapsed.Seconds(),
 	}
 	result := benchResult{
 		Backend:                backend,
@@ -636,6 +777,8 @@ func runBackend(ctx context.Context, opts options, backend string) (benchResult,
 		WaitTargetTxs:          waitTarget,
 		NodeStartSeconds:       nodeStartSeconds,
 		FirstHeightWaitSeconds: firstHeightWaitSeconds,
+		PhaseTimings:           phases,
+		ProfileArtifacts:       artifacts,
 	}
 	if waitErr != nil {
 		result.WaitError = waitErr.Error()
@@ -648,6 +791,11 @@ func runBackend(ctx context.Context, opts options, backend string) (benchResult,
 		result.ReadP99Millis = percentileMillis(rr.latency, 99)
 		result.ReadP999Millis = percentileMillisFloat(rr.latency, 99.9)
 		result.ReadMaxMillis = durationMillis(rr.latency[len(rr.latency)-1])
+	}
+	if artifacts != nil && artifacts.HeapProfile != "" {
+		if err := writeHeapProfile(artifacts.HeapProfile); err != nil {
+			return benchResult{}, err
+		}
 	}
 	return result, nil
 }
@@ -1091,8 +1239,8 @@ func writeSummary(path string, results []benchResult) error {
 	var b strings.Builder
 	b.WriteString("tm_e2e_bench summary\n")
 	for _, r := range results {
-		fmt.Fprintf(&b, "%s committed_txs=%d wait_target_txs=%d accepted=%d errors=%d timed_out=%t load_s=%.3f wait_s=%.3f drain_s=%.3f drain_tps=%.2f avg_accept_tps=%.2f non_empty_blocks=%d max_block_txs=%d max_block_bytes=%d data_bytes=%d read_rps=%.2f read_errors=%d read_first_error=%q read_hash_candidates=%d read_hash_count=%d read_validation_s=%.3f read_validation_complete=%t read_start_delay_s=%.3f read_p50_ms=%.3f read_p90_ms=%.3f read_p95_ms=%.3f read_p99_ms=%.3f read_p999_ms=%.3f read_max_ms=%.3f read_batch_size=%d read_latency_sample_rate=%d read_latency_samples=%d\n",
-			r.Backend, r.CommittedTxs, r.WaitTargetTxs, r.ProducerAccepted, r.ProducerErrors, r.TimedOut, r.LoadSeconds, r.WaitSeconds, r.DrainSeconds, r.DrainTPS, r.AvgCommitTPS, r.NonEmptyBlocks, r.MaxBlockTxs, r.MaxBlockBytes, r.DataBytes, r.ReadRPS, r.ReadErrors, r.ReadFirstError, r.ReadHashCandidates, r.ReadHashCount, r.ReadValidationSeconds, r.ReadValidationComplete, r.ReadStartDelaySeconds, r.ReadP50Millis, r.ReadP90Millis, r.ReadP95Millis, r.ReadP99Millis, r.ReadP999Millis, r.ReadMaxMillis, r.ReadBatchSize, r.ReadLatencySampleRate, r.ReadLatencySamples)
+		fmt.Fprintf(&b, "%s committed_txs=%d wait_target_txs=%d accepted=%d errors=%d timed_out=%t load_s=%.3f wait_s=%.3f drain_s=%.3f drain_tps=%.2f avg_accept_tps=%.2f non_empty_blocks=%d max_block_txs=%d max_block_bytes=%d data_bytes=%d read_rps=%.2f read_errors=%d read_first_error=%q read_hash_candidates=%d read_hash_count=%d read_validation_s=%.3f read_validation_complete=%t read_start_delay_s=%.3f read_p50_ms=%.3f read_p90_ms=%.3f read_p95_ms=%.3f read_p99_ms=%.3f read_p999_ms=%.3f read_max_ms=%.3f read_batch_size=%d read_latency_sample_rate=%d read_latency_samples=%d phase_backend_s=%.3f phase_node_start_s=%.3f phase_first_height_wait_s=%.3f phase_load_s=%.3f phase_settle_s=%.3f phase_wait_for_commit_s=%.3f phase_collect_block_stats_s=%.3f phase_collect_tx_hashes_s=%.3f phase_tx_index_readiness_s=%.3f phase_read_start_delay_s=%.3f phase_read_s=%.3f phase_dir_size_s=%.3f profile_scope=%q profile_cpu=%q profile_heap=%q\n",
+			r.Backend, r.CommittedTxs, r.WaitTargetTxs, r.ProducerAccepted, r.ProducerErrors, r.TimedOut, r.LoadSeconds, r.WaitSeconds, r.DrainSeconds, r.DrainTPS, r.AvgCommitTPS, r.NonEmptyBlocks, r.MaxBlockTxs, r.MaxBlockBytes, r.DataBytes, r.ReadRPS, r.ReadErrors, r.ReadFirstError, r.ReadHashCandidates, r.ReadHashCount, r.ReadValidationSeconds, r.ReadValidationComplete, r.ReadStartDelaySeconds, r.ReadP50Millis, r.ReadP90Millis, r.ReadP95Millis, r.ReadP99Millis, r.ReadP999Millis, r.ReadMaxMillis, r.ReadBatchSize, r.ReadLatencySampleRate, r.ReadLatencySamples, r.PhaseTimings.BackendSeconds, r.PhaseTimings.NodeStartSeconds, r.PhaseTimings.FirstHeightWaitSeconds, r.PhaseTimings.LoadSeconds, r.PhaseTimings.SettleSeconds, r.PhaseTimings.WaitForCommitSeconds, r.PhaseTimings.CollectBlockStatsSeconds, r.PhaseTimings.CollectTxHashesSeconds, r.PhaseTimings.TxIndexReadinessSeconds, r.PhaseTimings.ReadStartDelaySeconds, r.PhaseTimings.ReadSeconds, r.PhaseTimings.DirSizeSeconds, profileScope(r.ProfileArtifacts), profileCPU(r.ProfileArtifacts), profileHeap(r.ProfileArtifacts))
 	}
 	if len(results) >= 2 {
 		base := results[0]
@@ -1112,6 +1260,27 @@ func writeSummary(path string, results []benchResult) error {
 		}
 	}
 	return os.WriteFile(path, []byte(b.String()), 0644)
+}
+
+func profileScope(artifacts *profileArtifacts) string {
+	if artifacts == nil {
+		return ""
+	}
+	return artifacts.Scope
+}
+
+func profileCPU(artifacts *profileArtifacts) string {
+	if artifacts == nil {
+		return ""
+	}
+	return artifacts.CPUProfile
+}
+
+func profileHeap(artifacts *profileArtifacts) string {
+	if artifacts == nil {
+		return ""
+	}
+	return artifacts.HeapProfile
 }
 
 func percentileInt(v []int, p int) int {
