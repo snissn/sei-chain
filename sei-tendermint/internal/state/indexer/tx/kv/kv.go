@@ -85,8 +85,8 @@ func (txi *TxIndex) getRaw(key []byte) ([]byte, func()) {
 		return rawBytes, func() {}
 	}
 
-	buf, _ := txi.readPool.Get().([]byte)
-	rawBytes, err := txi.getAppender.GetAppend(key, buf[:0])
+	buf := txi.getReadBuffer()
+	rawBytes, err := txi.getAppender.GetAppend(key, (*buf)[:0])
 	if err != nil {
 		txi.putReadBuffer(buf)
 		panic(err)
@@ -96,15 +96,25 @@ func (txi *TxIndex) getRaw(key []byte) ([]byte, func()) {
 		return nil, func() {}
 	}
 	return rawBytes, func() {
-		txi.putReadBuffer(rawBytes)
+		*buf = rawBytes
+		txi.putReadBuffer(buf)
 	}
 }
 
-func (txi *TxIndex) putReadBuffer(buf []byte) {
-	if cap(buf) == 0 || cap(buf) > maxPooledReadBufferBytes {
+func (txi *TxIndex) getReadBuffer() *[]byte {
+	buf, _ := txi.readPool.Get().(*[]byte)
+	if buf == nil {
+		buf = new([]byte)
+	}
+	return buf
+}
+
+func (txi *TxIndex) putReadBuffer(buf *[]byte) {
+	if cap(*buf) == 0 || cap(*buf) > maxPooledReadBufferBytes {
 		return
 	}
-	txi.readPool.Put(buf[:0])
+	*buf = (*buf)[:0]
+	txi.readPool.Put(buf)
 }
 
 // Index indexes transactions using the given list of events. Each key
