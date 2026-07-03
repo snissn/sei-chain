@@ -35,6 +35,33 @@ func TestQueryTxFor(t *testing.T) {
 	)
 }
 
+func TestEventDataTxHashMetadata(t *testing.T) {
+	tx := Tx("foo")
+	suppliedHash := tx.Hash()
+	eventData := NewEventDataTxWithHash(types.TxResultV2{Tx: tx}, suppliedHash)
+
+	require.Equal(t, suppliedHash, eventData.TxHash())
+
+	events := eventData.ABCIEvents()
+	require.Len(t, events, 2)
+	assert.Equal(t, []byte("hash"), events[0].Attributes[0].Key)
+	assert.Equal(t, []byte(fmt.Sprintf("%X", suppliedHash)), events[0].Attributes[0].Value)
+}
+
+func TestEventDataTxWrongHashMetadataFallsBack(t *testing.T) {
+	tx := Tx("foo")
+	suppliedHash := Tx("supplied").Hash()
+	eventData := NewEventDataTxWithHash(types.TxResultV2{Tx: tx}, suppliedHash)
+
+	require.Equal(t, tx.Hash(), eventData.TxHash())
+	require.False(t, eventData.TxHashMetadata().IsPresent())
+
+	events := eventData.ABCIEvents()
+	require.Len(t, events, 2)
+	assert.Equal(t, []byte("hash"), events[0].Attributes[0].Key)
+	assert.Equal(t, []byte(fmt.Sprintf("%X", tx.Hash())), events[0].Attributes[0].Value)
+}
+
 func TestQueryForEvent(t *testing.T) {
 	assert.Equal(t,
 		"tm.event = 'NewBlock'",

@@ -2283,7 +2283,7 @@ func (cs *State) buildProposalBlock(proposal *types.Proposal) *types.Block {
 		logger.Debug("Missing txs when trying to build block", "missing_txs", missingTxs)
 		return nil
 	}
-	block := cs.state.MakeBlock(proposal.Height, txs, proposal.LastCommit, proposal.Evidence, proposal.ProposerAddress)
+	block := cs.state.MakeBlockWithTxHashes(proposal.Height, txs, proposal.TxHashes, proposal.LastCommit, proposal.Evidence, proposal.ProposerAddress)
 	block.Version = proposal.Version
 	block.Txs = txs
 	block.DataHash = block.Data.Hash(true)

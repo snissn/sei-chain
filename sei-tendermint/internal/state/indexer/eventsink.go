@@ -54,3 +54,9 @@ type EventSink interface {
 	// Stop will close the data store connection, if the eventsink supports it.
 	Stop() error
 }
+
+// TxEventIndexerWithHashes is an optional fast path for sinks that can consume
+// ordered tx hashes already validated by EventDataTx metadata.
+type TxEventIndexerWithHashes interface {
+	IndexTxEventsWithHashes([]*abci.TxResultV2, []types.TxHash) error
+}

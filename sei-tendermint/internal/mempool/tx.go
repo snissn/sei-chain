@@ -631,6 +631,13 @@ type ReapLimits struct {
 // returned transactions. Reaped txs are removed iff remove == true.
 // O(m log m) where m is the size of the txStore.
 func (s *txStore) Reap(l ReapLimits, remove bool) (types.Txs, int64) {
+	txs, _, gasEstimate := s.ReapWithHashes(l, remove)
+	return txs, gasEstimate
+}
+
+// ReapWithHashes returns reaped txs plus their cached hashes in the same
+// EVM-first order.
+func (s *txStore) ReapWithHashes(l ReapLimits, remove bool) (types.Txs, []types.TxHash, int64) {
 	maxTxs := l.MaxTxs.Or(utils.Max[uint64]())
 	maxBytes := l.MaxBytes.Or(utils.Max[int64]())
 	maxGasWanted := l.MaxGasWanted.Or(utils.Max[int64]())
@@ -688,12 +695,15 @@ func (s *txStore) Reap(l ReapLimits, remove bool) (types.Txs, int64) {
 
 	// EVM txs go first.
 	var evmTxs, nonEvmTxs types.Txs
+	var evmTxHashes, nonEvmTxHashes []types.TxHash
 	for _, wtx := range wtxs {
 		if wtx.evm.IsPresent() {
 			evmTxs = append(evmTxs, wtx.Tx())
+			evmTxHashes = append(evmTxHashes, wtx.Hash())
 		} else {
 			nonEvmTxs = append(nonEvmTxs, wtx.Tx())
+			nonEvmTxHashes = append(nonEvmTxHashes, wtx.Hash())
 		}
 	}
-	return append(evmTxs, nonEvmTxs...), totalGasEstimated
+	return append(evmTxs, nonEvmTxs...), append(evmTxHashes, nonEvmTxHashes...), totalGasEstimated
 }

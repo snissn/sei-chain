@@ -269,9 +269,21 @@ func (state State) MakeBlock(
 	evidence []types.Evidence,
 	proposerAddress []byte,
 ) *types.Block {
+	return state.MakeBlockWithTxHashes(height, txs, nil, commit, evidence, proposerAddress)
+}
 
+// MakeBlockWithTxHashes builds a block and attaches volatile ordered tx-hash
+// metadata when available from the direct proposal flow.
+func (state State) MakeBlockWithTxHashes(
+	height int64,
+	txs []types.Tx,
+	txHashes []types.TxHash,
+	commit *types.Commit,
+	evidence []types.Evidence,
+	proposerAddress []byte,
+) *types.Block {
 	// Build base block with block data.
-	block := types.MakeBlock(height, txs, commit, evidence)
+	block := types.MakeBlockWithTxHashes(height, txs, txHashes, commit, evidence)
 
 	// Fill rest of header with state data.
 	block.Populate(

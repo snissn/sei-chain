@@ -70,8 +70,9 @@ func (is *Service) publish(msg pubsub.Message) error {
 	curr := is.currentBlock.batch
 	if curr.Pending != 0 {
 		// GATHER: Accumulate a transaction into the current block's batch.
-		txResult := msg.Data().(types.EventDataTx).TxResultV2
-		if err := curr.Add(&txResult); err != nil {
+		txEvent := msg.Data().(types.EventDataTx)
+		txResult := txEvent.TxResultV2
+		if err := curr.AddTxEvent(txEvent); err != nil {
 			logger.Error("failed to add tx to batch",
 				"height", is.currentBlock.height, "index", txResult.Index, "err", err)
 		}
@@ -96,7 +97,7 @@ func (is *Service) publish(msg pubsub.Message) error {
 
 			if curr.Size() != 0 {
 				start := time.Now()
-				err := sink.IndexTxEvents(curr.Ops)
+				err := indexTxEvents(sink, curr)
 				if err != nil {
 					logger.Error("failed to index block txs",
 						"height", is.currentBlock.height, "err", err)
@@ -112,6 +113,15 @@ func (is *Service) publish(msg pubsub.Message) error {
 	}
 
 	return nil
+}
+
+func indexTxEvents(sink EventSink, batch *Batch) error {
+	if sinkWithHashes, ok := sink.(TxEventIndexerWithHashes); ok {
+		if txHashes, complete := batch.TxHashes(); complete {
+			return sinkWithHashes.IndexTxEventsWithHashes(batch.Ops, txHashes)
+		}
+	}
+	return sink.IndexTxEvents(batch.Ops)
 }
 
 // OnStart implements part of service.Service. It registers an observer for the
