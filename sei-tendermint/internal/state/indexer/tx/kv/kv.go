@@ -32,7 +32,10 @@ type TxIndex struct {
 	readPool    sync.Pool
 }
 
+const maxPooledReadBufferBytes = 1 << 20
+
 type getAppender interface {
+	// GetAppend appends the value for key to dst and returns caller-owned bytes.
 	GetAppend(key, dst []byte) ([]byte, error)
 }
 
@@ -85,16 +88,23 @@ func (txi *TxIndex) getRaw(key []byte) ([]byte, func()) {
 	buf, _ := txi.readPool.Get().([]byte)
 	rawBytes, err := txi.getAppender.GetAppend(key, buf[:0])
 	if err != nil {
-		txi.readPool.Put(buf[:0])
+		txi.putReadBuffer(buf)
 		panic(err)
 	}
 	if rawBytes == nil {
-		txi.readPool.Put(buf[:0])
+		txi.putReadBuffer(buf)
 		return nil, func() {}
 	}
 	return rawBytes, func() {
-		txi.readPool.Put(rawBytes[:0])
+		txi.putReadBuffer(rawBytes)
 	}
+}
+
+func (txi *TxIndex) putReadBuffer(buf []byte) {
+	if cap(buf) == 0 || cap(buf) > maxPooledReadBufferBytes {
+		return
+	}
+	txi.readPool.Put(buf[:0])
 }
 
 // Index indexes transactions using the given list of events. Each key
