@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -22,6 +23,8 @@ import (
 	tmproto "github.com/sei-protocol/sei-chain/sei-tendermint/proto/tendermint/types"
 	"github.com/sei-protocol/sei-chain/sei-tendermint/version"
 )
+
+var ErrTxHashMetadataLength = errors.New("tx hash metadata length does not match tx count")
 
 // SkipLastResultsHashValidation controls whether LastResultsHash validation
 // is skipped during block validation. This is set to true when the Giga
@@ -58,11 +61,7 @@ type Block struct {
 }
 
 func (b *Block) GetTxHashes() []TxHash {
-	txHashes := make([]TxHash, len(b.Txs))
-	for i := range b.Txs {
-		txHashes[i] = b.Data.Txs[i].Hash()
-	}
-	return txHashes
+	return b.Data.TxHashes()
 }
 
 // ValidateBasic performs basic validation that doesn't involve state data.
@@ -98,8 +97,10 @@ func (b *Block) ValidateBasic(policy ConsensusPolicy) error {
 		}
 	}
 
-	// NOTE: b.Data.Txs may be nil, but b.Data.Hash() still works fine.
-	if w, g := b.Data.Hash(false), b.DataHash; !bytes.Equal(w, g) {
+	// NOTE: b.Data.Txs may be nil, but b.Data.HashFromTxs() still works fine.
+	// Validation deliberately recomputes from tx bytes instead of trusting
+	// volatile tx-hash metadata.
+	if w, g := b.Data.HashFromTxs(), b.DataHash; !bytes.Equal(w, g) {
 		if err := policy.HandleError(fmt.Errorf(
 			"wrong Header.DataHash: expected %X, got %X, len of txs %d: %w", w, g, len(b.Txs), ErrDataHash)); err != nil {
 			return err
@@ -373,14 +374,25 @@ func MaxDataBytesNoEvidence(maxBytes int64, valsCount int) int64 {
 // computed from itself.
 // It populates the same set of fields validated by ValidateBasic.
 func MakeBlock(height int64, txs []Tx, lastCommit *Commit, evidence []Evidence) *Block {
+	return MakeBlockWithTxHashes(height, txs, nil, lastCommit, evidence)
+}
+
+// MakeBlockWithTxHashes returns a new block with ordered transaction hash
+// metadata attached when it matches tx order. The metadata is volatile and is
+// not persisted in protobuf form.
+func MakeBlockWithTxHashes(height int64, txs []Tx, txHashes []TxHash, lastCommit *Commit, evidence []Evidence) *Block {
+	data := Data{
+		Txs: txs,
+	}
+	if len(txHashes) != 0 {
+		_ = data.SetTxHashes(txHashes)
+	}
 	block := &Block{
 		Header: Header{
 			Version: version.Consensus{Block: version.BlockProtocol, App: 0},
 			Height:  height,
 		},
-		Data: Data{
-			Txs: txs,
-		},
+		Data:       data,
 		Evidence:   evidence,
 		LastCommit: lastCommit,
 	}
@@ -1101,7 +1113,8 @@ type Data struct {
 	Txs Txs `json:"txs"`
 
 	// Volatile
-	hash tmbytes.HexBytes
+	hash     tmbytes.HexBytes
+	txHashes []TxHash
 }
 
 // Hash returns the hash of the data
@@ -1109,13 +1122,65 @@ func (data *Data) Hash(overwrite bool) tmbytes.HexBytes {
 	if data == nil {
 		return (Txs{}).Hash()
 	}
-	if data.hash != nil && overwrite {
-		data.hash = data.Txs.Hash()
+	if overwrite {
+		data.hash = data.HashFromTxs()
+		return data.hash
 	}
 	if data.hash == nil {
-		data.hash = data.Txs.Hash() // NOTE: leaves of merkle tree are TxIDs
+		data.hash = data.hashTxs() // NOTE: leaves of merkle tree are TxIDs
 	}
 	return data.hash
+}
+
+func (data *Data) hashTxs() tmbytes.HexBytes {
+	if txHashes, ok := data.txHashesForData(); ok {
+		return HashFromTxHashes(txHashes)
+	}
+	return data.Txs.Hash()
+}
+
+// HashFromTxs returns the transaction Merkle root computed only from tx bytes,
+// ignoring volatile tx-hash metadata.
+func (data *Data) HashFromTxs() tmbytes.HexBytes {
+	if data == nil {
+		return (Txs{}).Hash()
+	}
+	return data.Txs.Hash()
+}
+
+// SetTxHashes attaches ordered volatile transaction hash metadata to data.
+// The metadata is trusted direct-flow state, not a consensus or protobuf field.
+func (data *Data) SetTxHashes(txHashes []TxHash) error {
+	if data == nil {
+		return errors.New("nil data")
+	}
+	if len(txHashes) != len(data.Txs) {
+		data.txHashes = nil
+		data.hash = nil
+		return ErrTxHashMetadataLength
+	}
+	data.txHashes = slices.Clone(txHashes)
+	data.hash = nil
+	return nil
+}
+
+// TxHashes returns ordered transaction hashes, using attached metadata when it
+// matches tx order length and recomputing from tx bytes otherwise.
+func (data *Data) TxHashes() []TxHash {
+	if data == nil {
+		return nil
+	}
+	if txHashes, ok := data.txHashesForData(); ok {
+		return slices.Clone(txHashes)
+	}
+	return data.Txs.Hashes()
+}
+
+func (data *Data) txHashesForData() ([]TxHash, bool) {
+	if data == nil || len(data.txHashes) != len(data.Txs) {
+		return nil, false
+	}
+	return data.txHashes, true
 }
 
 // StringIndented returns an indented string representation of the transactions.

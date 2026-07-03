@@ -58,6 +58,42 @@ func TestBlockAddEvidence(t *testing.T) {
 	require.NotNil(t, block.EvidenceHash)
 }
 
+func TestMakeBlockWithTxHashesMatchesMakeBlock(t *testing.T) {
+	txs := Txs{Tx("alpha"), Tx("beta"), Tx("gamma")}
+
+	recomputed := MakeBlock(1, txs, nil, nil)
+	withHashes := MakeBlockWithTxHashes(1, txs, txs.Hashes(), nil, nil)
+
+	require.Equal(t, recomputed.DataHash, withHashes.DataHash)
+	require.Equal(t, recomputed.Data.Hash(false), withHashes.Data.Hash(false))
+	require.Equal(t, recomputed.GetTxHashes(), withHashes.GetTxHashes())
+}
+
+func TestMakeBlockWithWrongTxHashesFailsValidateBasic(t *testing.T) {
+	ctx := t.Context()
+
+	txs := Txs{Tx("alpha"), Tx("beta")}
+	wrongHashes := Txs{Tx("wrong-alpha"), Tx("wrong-beta")}.Hashes()
+	lastID := makeBlockIDRandom()
+	height := int64(3)
+
+	voteSet, _, vals := randVoteSet(ctx, t, height-1, 1, tmproto.PrecommitType, 10, 1)
+	commit, err := MakeCommit(ctx, lastID, height-1, 1, voteSet, vals, time.Now())
+	require.NoError(t, err)
+	pubKey, err := vals[0].GetPubKey(ctx)
+	require.NoError(t, err)
+
+	block := MakeBlockWithTxHashes(height, txs, wrongHashes, commit, nil)
+	block.ProposerAddress = pubKey.Address()
+	err = block.ValidateBasic(DefaultConsensusPolicy())
+	require.ErrorIs(t, err, ErrDataHash)
+
+	pb, err := block.ToProto()
+	require.NoError(t, err)
+	_, err = BlockFromProto(pb)
+	require.ErrorIs(t, err, ErrDataHash)
+}
+
 func TestBlockValidateBasic(t *testing.T) {
 	ctx := t.Context()
 
@@ -865,7 +901,8 @@ func TestBlockProtoBuf(t *testing.T) {
 		if tc.expPass2 {
 			require.NoError(t, err, tc.msg)
 			require.EqualValues(t, tc.b1.Header, block.Header, tc.msg)
-			require.EqualValues(t, tc.b1.Data, block.Data, tc.msg)
+			require.EqualValues(t, tc.b1.Data.Txs, block.Data.Txs, tc.msg)
+			require.EqualValues(t, tc.b1.Data.HashFromTxs(), block.Data.HashFromTxs(), tc.msg)
 			require.EqualValues(t, tc.b1.Evidence, block.Evidence, tc.msg)
 			require.EqualValues(t, *tc.b1.LastCommit, *block.LastCommit, tc.msg)
 		} else {

@@ -138,7 +138,7 @@ func (b *EventBus) PublishEventTx(data types.EventDataTx) error {
 		Attributes: []abci.EventAttribute{
 			{
 				Key:   []byte(tokens[1]),
-				Value: []byte(fmt.Sprintf("%X", types.Tx(data.Tx).Hash())),
+				Value: []byte(fmt.Sprintf("%X", data.TxHash())),
 			},
 		},
 	})
