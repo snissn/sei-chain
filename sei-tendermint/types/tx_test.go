@@ -2,6 +2,7 @@ package types
 
 import (
 	"bytes"
+	"errors"
 	"math/rand"
 	"testing"
 
@@ -43,6 +44,70 @@ func TestTxIndexByHash(t *testing.T) {
 		require.Equal(t, -1, txs.IndexByHash(TxHash{}))
 		require.Equal(t, -1, txs.IndexByHash(Tx("foodnwkf").Hash()))
 	}
+}
+
+func TestTxHashMetadataMatchesRecomputedHash(t *testing.T) {
+	txs := Txs{Tx("alpha"), Tx("beta"), Tx("gamma")}
+	txHashes := txs.Hashes()
+
+	require.Equal(t, txs.Hash(), HashFromTxHashes(txHashes))
+
+	data := Data{Txs: txs}
+	require.NoError(t, data.SetTxHashes(txHashes))
+	require.Equal(t, txs.Hash(), data.Hash(false))
+	require.Equal(t, txHashes, data.TxHashes())
+
+	returned := data.TxHashes()
+	returned[0] = TxHash{}
+	require.Equal(t, txHashes, data.TxHashes())
+}
+
+func TestTxHashMetadataMismatchFallsBack(t *testing.T) {
+	txs := Txs{Tx("alpha"), Tx("beta")}
+	data := Data{Txs: txs}
+
+	err := data.SetTxHashes(txs.Hashes()[:1])
+	if !errors.Is(err, ErrTxHashMetadataLength) {
+		t.Fatalf("expected ErrTxHashMetadataLength, got %v", err)
+	}
+	require.Equal(t, txs.Hash(), data.Hash(false))
+	require.Equal(t, txs.Hashes(), data.TxHashes())
+}
+
+func TestTxHashMetadataNotPersistedInDataProto(t *testing.T) {
+	txs := Txs{Tx("alpha"), Tx("beta")}
+	data := Data{Txs: txs}
+	require.NoError(t, data.SetTxHashes(txs.Hashes()))
+
+	pb := data.ToProto()
+	restored, err := DataFromProto(&pb)
+	require.NoError(t, err)
+
+	require.Equal(t, txs.Hash(), restored.Hash(false))
+	require.Equal(t, txs.Hashes(), restored.TxHashes())
+}
+
+func BenchmarkDataHash(b *testing.B) {
+	txs := makeTxs(2048, 256)
+	txHashes := txs.Hashes()
+
+	b.Run("recompute", func(b *testing.B) {
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			data := Data{Txs: txs}
+			_ = data.Hash(false)
+		}
+	})
+	b.Run("with_tx_hash_metadata", func(b *testing.B) {
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			data := Data{Txs: txs}
+			if err := data.SetTxHashes(txHashes); err != nil {
+				b.Fatal(err)
+			}
+			_ = data.Hash(false)
+		}
+	})
 }
 
 func TestValidTxProof(t *testing.T) {

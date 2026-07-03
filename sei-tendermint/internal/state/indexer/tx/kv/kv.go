@@ -122,12 +122,24 @@ func (txi *TxIndex) putReadBuffer(buf *[]byte) {
 // respective attribute's key delimited by a "." (eg. "account.number").
 // Any event with an empty type is not indexed.
 func (txi *TxIndex) Index(results []*abci.TxResultV2) error {
+	return txi.index(results, nil)
+}
+
+// IndexWithHashes indexes transactions using ordered tx hashes when the hash
+// list matches the result list. Length mismatches fall back to recomputing.
+func (txi *TxIndex) IndexWithHashes(results []*abci.TxResultV2, txHashes []types.TxHash) error {
+	if len(txHashes) != len(results) {
+		return txi.Index(results)
+	}
+	return txi.index(results, txHashes)
+}
+
+func (txi *TxIndex) index(results []*abci.TxResultV2, txHashes []types.TxHash) error {
 	b := txi.store.NewBatch()
 	defer func() { _ = b.Close() }()
 
-	for _, result := range results {
-		hash := types.Tx(result.Tx).Hash()
-		hashBytes := hash[:]
+	for i, result := range results {
+		hashBytes := txHashBytes(result, txHashes, i)
 
 		// index tx by events
 		err := txi.indexEvents(result, hashBytes, b)
@@ -153,6 +165,14 @@ func (txi *TxIndex) Index(results []*abci.TxResultV2) error {
 	}
 
 	return b.WriteSync()
+}
+
+func txHashBytes(result *abci.TxResultV2, txHashes []types.TxHash, index int) []byte {
+	hash := types.Tx(result.Tx).Hash()
+	if len(txHashes) == 0 || txHashes[index] != hash {
+		return hash[:]
+	}
+	return txHashes[index][:]
 }
 
 func (txi *TxIndex) indexEvents(result *abci.TxResultV2, hash []byte, store dbm.Batch) error {

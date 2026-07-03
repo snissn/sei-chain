@@ -64,6 +64,62 @@ func TestTxIndex(t *testing.T) {
 	assert.Equal(t, txResult2, loadedTxResult2)
 }
 
+func TestTxIndexWithHashes(t *testing.T) {
+	txIndexer := NewTxIndex(dbm.NewMemDB())
+
+	tx := types.Tx("HELLO WORLD")
+	txResult := &abci.TxResultV2{
+		Height: 1,
+		Index:  0,
+		Tx:     tx,
+		Result: abci.ExecTxResult{Code: abci.CodeTypeOK},
+	}
+
+	require.NoError(t, txIndexer.IndexWithHashes([]*abci.TxResultV2{txResult}, []types.TxHash{tx.Hash()}))
+	loadedTxResult, err := txIndexer.Get(tx.Hash().Bytes())
+	require.NoError(t, err)
+	require.Equal(t, txResult, loadedTxResult)
+}
+
+func TestTxIndexWithHashesLengthMismatchFallsBack(t *testing.T) {
+	txIndexer := NewTxIndex(dbm.NewMemDB())
+
+	tx := types.Tx("HELLO WORLD")
+	txResult := &abci.TxResultV2{
+		Height: 1,
+		Index:  0,
+		Tx:     tx,
+		Result: abci.ExecTxResult{Code: abci.CodeTypeOK},
+	}
+
+	require.NoError(t, txIndexer.IndexWithHashes([]*abci.TxResultV2{txResult}, nil))
+	loadedTxResult, err := txIndexer.Get(tx.Hash().Bytes())
+	require.NoError(t, err)
+	require.Equal(t, txResult, loadedTxResult)
+}
+
+func TestTxIndexWithHashesMismatchFallsBack(t *testing.T) {
+	txIndexer := NewTxIndex(dbm.NewMemDB())
+
+	tx := types.Tx("HELLO WORLD")
+	txResult := &abci.TxResultV2{
+		Height: 1,
+		Index:  0,
+		Tx:     tx,
+		Result: abci.ExecTxResult{Code: abci.CodeTypeOK},
+	}
+	staleHash := types.Tx("STALE").Hash()
+
+	require.NoError(t, txIndexer.IndexWithHashes([]*abci.TxResultV2{txResult}, []types.TxHash{staleHash}))
+	loadedTxResult, err := txIndexer.Get(tx.Hash().Bytes())
+	require.NoError(t, err)
+	require.Equal(t, txResult, loadedTxResult)
+
+	loadedTxResult, err = txIndexer.Get(staleHash.Bytes())
+	require.NoError(t, err)
+	require.Nil(t, loadedTxResult)
+}
+
 func TestTxSearch(t *testing.T) {
 	indexer := NewTxIndex(dbm.NewMemDB())
 

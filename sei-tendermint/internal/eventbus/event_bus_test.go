@@ -70,6 +70,91 @@ func TestEventBusPublishEventTx(t *testing.T) {
 	}
 }
 
+func TestEventBusPublishEventTxUsesSuppliedHash(t *testing.T) {
+	ctx := t.Context()
+
+	eventBus := eventbus.NewDefault()
+	err := eventBus.Start(ctx)
+	require.NoError(t, err)
+
+	tx := types.Tx("foo")
+	suppliedHash := tx.Hash()
+
+	query := fmt.Sprintf("tm.event='Tx' AND tx.height=1 AND tx.hash='%X'", suppliedHash)
+	txsSub, err := eventBus.SubscribeWithArgs(ctx, tmpubsub.SubscribeArgs{
+		ClientID: "test",
+		Query:    tmquery.MustCompile(query),
+	})
+	require.NoError(t, err)
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		msg, err := txsSub.Next(ctx)
+		assert.NoError(t, err)
+
+		edt := msg.Data().(types.EventDataTx)
+		assert.EqualValues(t, tx, edt.Tx)
+		assert.Equal(t, suppliedHash, edt.TxHash())
+	}()
+
+	err = eventBus.PublishEventTx(types.NewEventDataTxWithHash(abci.TxResultV2{
+		Height: 1,
+		Index:  0,
+		Tx:     tx,
+	}, suppliedHash))
+	assert.NoError(t, err)
+
+	select {
+	case <-done:
+	case <-time.After(1 * time.Second):
+		t.Fatal("did not receive a transaction after 1 sec.")
+	}
+}
+
+func TestEventBusPublishEventTxRejectsStaleSuppliedHash(t *testing.T) {
+	ctx := t.Context()
+
+	eventBus := eventbus.NewDefault()
+	err := eventBus.Start(ctx)
+	require.NoError(t, err)
+
+	tx := types.Tx("foo")
+	staleHash := types.Tx("stale").Hash()
+	actualHash := tx.Hash()
+
+	query := fmt.Sprintf("tm.event='Tx' AND tx.height=1 AND tx.hash='%X'", actualHash)
+	txsSub, err := eventBus.SubscribeWithArgs(ctx, tmpubsub.SubscribeArgs{
+		ClientID: "test",
+		Query:    tmquery.MustCompile(query),
+	})
+	require.NoError(t, err)
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		msg, err := txsSub.Next(ctx)
+		assert.NoError(t, err)
+
+		edt := msg.Data().(types.EventDataTx)
+		assert.EqualValues(t, tx, edt.Tx)
+		assert.Equal(t, actualHash, edt.TxHash())
+	}()
+
+	err = eventBus.PublishEventTx(types.NewEventDataTxWithHash(abci.TxResultV2{
+		Height: 1,
+		Index:  0,
+		Tx:     tx,
+	}, staleHash))
+	assert.NoError(t, err)
+
+	select {
+	case <-done:
+	case <-time.After(1 * time.Second):
+		t.Fatal("did not receive a transaction after 1 sec.")
+	}
+}
+
 func TestEventBusPublishEventNewBlock(t *testing.T) {
 	ctx := t.Context()
 	eventBus := eventbus.NewDefault()

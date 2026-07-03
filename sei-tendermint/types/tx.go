@@ -32,6 +32,20 @@ func (txs Txs) Hash() []byte {
 	return merkle.HashFromByteSlices(hl)
 }
 
+// Hashes returns the ordered TMHASH hash for each transaction.
+func (txs Txs) Hashes() []TxHash {
+	hashes := make([]TxHash, len(txs))
+	for i := range txs {
+		hashes[i] = txs[i].Hash()
+	}
+	return hashes
+}
+
+// HashFromTxHashes returns the Merkle root hash of an ordered transaction hash list.
+func HashFromTxHashes(txHashes []TxHash) []byte {
+	return merkle.HashFromByteSlices(txHashList(txHashes))
+}
+
 // Index returns the index of this transaction in the list, or -1 if not found
 func (txs Txs) Index(tx Tx) int {
 	for i := range txs {
@@ -64,10 +78,13 @@ func (txs Txs) Proof(i int) TxProof {
 }
 
 func (txs Txs) hashList() [][]byte {
-	hl := make([][]byte, len(txs))
-	for i := 0; i < len(txs); i++ {
-		h := txs[i].Hash()
-		hl[i] = h[:]
+	return txHashList(txs.Hashes())
+}
+
+func txHashList(txHashes []TxHash) [][]byte {
+	hl := make([][]byte, len(txHashes))
+	for i := range txHashes {
+		hl[i] = txHashes[i][:]
 	}
 	return hl
 }

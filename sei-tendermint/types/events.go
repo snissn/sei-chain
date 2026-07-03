@@ -8,6 +8,7 @@ import (
 	abci "github.com/sei-protocol/sei-chain/sei-tendermint/abci/types"
 	"github.com/sei-protocol/sei-chain/sei-tendermint/internal/jsontypes"
 	tmquery "github.com/sei-protocol/sei-chain/sei-tendermint/internal/pubsub/query"
+	"github.com/sei-protocol/sei-chain/sei-tendermint/libs/utils"
 	"github.com/sei-protocol/sei-chain/sei-tendermint/proto/tendermint/types"
 )
 
@@ -275,6 +276,25 @@ func (e EventDataNewEvidence) ToLegacy() LegacyEventData {
 // All txs fire EventDataTx
 type EventDataTx struct {
 	abci.TxResultV2
+	txHash utils.Option[TxHash]
+}
+
+func NewEventDataTxWithHash(txResult abci.TxResultV2, txHash TxHash) EventDataTx {
+	eventData := EventDataTx{
+		TxResultV2: txResult,
+	}
+	if txHash == Tx(txResult.Tx).Hash() {
+		eventData.txHash = utils.Some(txHash)
+	}
+	return eventData
+}
+
+func (e EventDataTx) TxHash() TxHash {
+	return e.txHash.Or(Tx(e.Tx).Hash())
+}
+
+func (e EventDataTx) TxHashMetadata() utils.Option[TxHash] {
+	return e.txHash
 }
 
 // TypeTag implements the required method of jsontypes.Tagged.
@@ -283,7 +303,7 @@ func (EventDataTx) TypeTag() string { return "tendermint/event/Tx_new" }
 // ABCIEvents implements the eventlog.ABCIEventer interface.
 func (e EventDataTx) ABCIEvents() []abci.Event {
 	base := []abci.Event{
-		eventWithAttr(TxHashKey, fmt.Sprintf("%X", Tx(e.Tx).Hash())),
+		eventWithAttr(TxHashKey, fmt.Sprintf("%X", e.TxHash())),
 		eventWithAttr(TxHeightKey, fmt.Sprintf("%d", e.Height)),
 	}
 	return append(base, e.Result.Events...)
