@@ -43,6 +43,10 @@ func (kves *EventSink) IndexTxEvents(results []*abci.TxResultV2) error {
 	return kves.txi.Index(results)
 }
 
+func (kves *EventSink) IndexTxEventsWithHashes(results []*abci.TxResultV2, txHashes []types.TxHash) error {
+	return kves.txi.IndexWithVerifiedHashes(results, txHashes)
+}
+
 func (kves *EventSink) SearchBlockEvents(ctx context.Context, q *query.Query) ([]int64, error) {
 	return kves.bi.Search(ctx, q)
 }
