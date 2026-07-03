@@ -187,6 +187,17 @@ func main() {
 	flag.StringVar(&opts.memProfile, "memprofile", "", "write heap profile to file after the run")
 	flag.Parse()
 
+	outDir, err := safeOutputDir(opts.outDir)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "tm_e2e_bench: %v\n", err)
+		os.Exit(1)
+	}
+	opts.outDir = outDir
+	if err := validateCPUProfilePath(opts.cpuProfile, opts.outDir); err != nil {
+		fmt.Fprintf(os.Stderr, "tm_e2e_bench: %v\n", err)
+		os.Exit(1)
+	}
+
 	if opts.cpuProfile != "" {
 		if err := os.MkdirAll(filepath.Dir(opts.cpuProfile), 0755); err != nil {
 			fmt.Fprintf(os.Stderr, "tm_e2e_bench: %v\n", err)
@@ -208,7 +219,7 @@ func main() {
 		}()
 	}
 
-	err := run(context.Background(), opts)
+	err = run(context.Background(), opts)
 	if opts.memProfile != "" {
 		if profileErr := writeHeapProfile(opts.memProfile); profileErr != nil && err == nil {
 			err = profileErr
@@ -314,6 +325,21 @@ func safeOutputDir(path string) (string, error) {
 		}
 	}
 	return clean, nil
+}
+
+func validateCPUProfilePath(profilePath string, outDir string) error {
+	if strings.TrimSpace(profilePath) == "" {
+		return nil
+	}
+	abs, err := filepath.Abs(profilePath)
+	if err != nil {
+		return err
+	}
+	clean := filepath.Clean(abs)
+	if sameOrParent(outDir, clean) {
+		return fmt.Errorf("cpuprofile must not be inside output directory %q because it is cleaned before benchmark runs", outDir)
+	}
+	return nil
 }
 
 func sameOrParent(parent string, child string) bool {
@@ -467,6 +493,7 @@ func runBackend(ctx context.Context, opts options, backend string) (benchResult,
 	if err := svc.Start(ctx); err != nil {
 		return benchResult{}, err
 	}
+	nodeStartSeconds := time.Since(nodeStart).Seconds()
 	defer svc.Stop()
 
 	client, err := tmlocal.New(svc)
@@ -477,6 +504,7 @@ func runBackend(ctx context.Context, opts options, backend string) (benchResult,
 	if err := waitForHeight(ctx, client, 1, 30*time.Second); err != nil {
 		return benchResult{}, err
 	}
+	firstHeightWaitSeconds := time.Since(firstHeightStart).Seconds()
 	startStatus, err := client.Status(ctx)
 	if err != nil {
 		return benchResult{}, err
@@ -606,8 +634,8 @@ func runBackend(ctx context.Context, opts options, backend string) (benchResult,
 		TargetDuration:         opts.duration,
 		TargetMaxTxs:           opts.maxTxs,
 		WaitTargetTxs:          waitTarget,
-		NodeStartSeconds:       time.Since(nodeStart).Seconds(),
-		FirstHeightWaitSeconds: time.Since(firstHeightStart).Seconds(),
+		NodeStartSeconds:       nodeStartSeconds,
+		FirstHeightWaitSeconds: firstHeightWaitSeconds,
 	}
 	if waitErr != nil {
 		result.WaitError = waitErr.Error()
