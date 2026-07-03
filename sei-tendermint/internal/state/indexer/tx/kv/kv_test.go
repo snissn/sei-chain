@@ -2,6 +2,7 @@ package kv
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
 	"testing"
 
@@ -378,3 +379,126 @@ func BenchmarkTxIndex500(b *testing.B)   { benchmarkTxIndex(500, b) }
 func BenchmarkTxIndex1000(b *testing.B)  { benchmarkTxIndex(1000, b) }
 func BenchmarkTxIndex2000(b *testing.B)  { benchmarkTxIndex(2000, b) }
 func BenchmarkTxIndex10000(b *testing.B) { benchmarkTxIndex(10000, b) }
+
+func BenchmarkTxIndexGet(b *testing.B) {
+	const (
+		txsCount     = 100_000
+		txPayloadLen = 1024
+	)
+	for _, backend := range []dbm.BackendType{dbm.GoLevelDBBackend, dbm.BackendType("treedb")} {
+		b.Run(string(backend), func(b *testing.B) {
+			dir := b.TempDir()
+			store, err := dbm.NewDB("tx_index_get", backend, dir)
+			if err != nil && backend == dbm.BackendType("treedb") {
+				b.Skipf("%s backend unavailable: %v", backend, err)
+			}
+			require.NoError(b, err)
+			defer func() { require.NoError(b, store.Close()) }()
+
+			txIndexer := NewTxIndex(store)
+			results := make([]*abci.TxResultV2, 0, txsCount)
+			hashes := make([][]byte, 0, txsCount)
+			for i := range txsCount {
+				tx := makeBenchmarkTxPayload(i, txPayloadLen)
+				result := &abci.TxResultV2{
+					Height: int64(i / 10_000),
+					Index:  uint32(i),
+					Tx:     tx,
+					Result: abci.ExecTxResult{
+						Code:   abci.CodeTypeOK,
+						Events: []abci.Event{},
+					},
+				}
+				results = append(results, result)
+				hashes = append(hashes, types.Tx(tx).Hash().Bytes())
+			}
+			require.NoError(b, txIndexer.Index(results))
+
+			b.ReportAllocs()
+			b.SetBytes(txPayloadLen)
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				result, err := txIndexer.Get(hashes[i%len(hashes)])
+				if err != nil {
+					b.Fatal(err)
+				}
+				if result == nil {
+					b.Fatal("missing tx")
+				}
+			}
+		})
+	}
+}
+
+func BenchmarkTxIndexGetParallel(b *testing.B) {
+	const (
+		txsCount     = 100_000
+		txPayloadLen = 1024
+	)
+	for _, backend := range []dbm.BackendType{dbm.GoLevelDBBackend, dbm.BackendType("treedb")} {
+		b.Run(string(backend), func(b *testing.B) {
+			dir := b.TempDir()
+			store, err := dbm.NewDB("tx_index_get_parallel", backend, dir)
+			if err != nil && backend == dbm.BackendType("treedb") {
+				b.Skipf("%s backend unavailable: %v", backend, err)
+			}
+			require.NoError(b, err)
+			defer func() { require.NoError(b, store.Close()) }()
+
+			txIndexer := NewTxIndex(store)
+			results := make([]*abci.TxResultV2, 0, txsCount)
+			hashes := make([][]byte, 0, txsCount)
+			for i := range txsCount {
+				tx := makeBenchmarkTxPayload(i, txPayloadLen)
+				result := &abci.TxResultV2{
+					Height: int64(i / 10_000),
+					Index:  uint32(i),
+					Tx:     tx,
+					Result: abci.ExecTxResult{
+						Code:   abci.CodeTypeOK,
+						Events: []abci.Event{},
+					},
+				}
+				results = append(results, result)
+				hashes = append(hashes, types.Tx(tx).Hash().Bytes())
+			}
+			require.NoError(b, txIndexer.Index(results))
+
+			b.ReportAllocs()
+			b.SetBytes(txPayloadLen)
+			b.ResetTimer()
+			b.RunParallel(func(pb *testing.PB) {
+				var i uint64
+				for pb.Next() {
+					result, err := txIndexer.Get(hashes[i%uint64(len(hashes))])
+					if err != nil {
+						b.Fatal(err)
+					}
+					if result == nil {
+						b.Fatal("missing tx")
+					}
+					i++
+				}
+			})
+		})
+	}
+}
+
+func makeBenchmarkTxPayload(i int, size int) []byte {
+	tx := make([]byte, size)
+	if len(tx) >= 8 {
+		binary.LittleEndian.PutUint64(tx, uint64(i))
+	} else {
+		for j := range tx {
+			tx[j] = byte(uint(i) >> (8 * j))
+		}
+	}
+	x := uint64(i) + 0x9e3779b97f4a7c15
+	for j := min(8, len(tx)); j < len(tx); j++ {
+		x ^= x << 13
+		x ^= x >> 7
+		x ^= x << 17
+		tx[j] = byte(x)
+	}
+	return tx
+}

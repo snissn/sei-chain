@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/google/orderedcode"
@@ -26,13 +27,23 @@ var _ indexer.TxIndexer = (*TxIndex)(nil)
 // 1. txhash - result  (primary key)
 // 2. event - txhash   (secondary key)
 type TxIndex struct {
-	store dbm.DB
+	store       dbm.DB
+	getAppender getAppender
+	readPool    sync.Pool
+}
+
+const maxPooledReadBufferBytes = 1 << 20
+
+type getAppender interface {
+	// GetAppend appends the value for key to dst and returns caller-owned bytes.
+	GetAppend(key, dst []byte) ([]byte, error)
 }
 
 // NewTxIndex creates new KV indexer.
 func NewTxIndex(store dbm.DB) *TxIndex {
 	return &TxIndex{
-		store: store,
+		store:       store,
+		getAppender: getAppenderFor(store),
 	}
 }
 
@@ -43,21 +54,67 @@ func (txi *TxIndex) Get(hash []byte) (*abci.TxResultV2, error) {
 		return nil, indexer.ErrorEmptyHash
 	}
 
-	rawBytes, err := txi.store.Get(primaryKey(hash))
-	if err != nil {
-		panic(err)
-	}
+	rawBytes, release := txi.getRaw(primaryKey(hash))
+	defer release()
 	if rawBytes == nil {
 		return nil, nil
 	}
 
-	txResult := new(abci.TxResult)
-	err = proto.Unmarshal(rawBytes, txResult)
-	if err != nil {
+	var txResult abci.TxResult
+	if err := txResult.Unmarshal(rawBytes); err != nil {
 		return nil, fmt.Errorf("error reading TxResult: %w", err)
 	}
 
 	return &abci.TxResultV2{Height: txResult.Height, Index: txResult.Index, Tx: txResult.Tx, Result: txResult.Result}, nil
+}
+
+func getAppenderFor(store dbm.DB) getAppender {
+	getter, ok := store.(getAppender)
+	if !ok {
+		return nil
+	}
+	return getter
+}
+
+func (txi *TxIndex) getRaw(key []byte) ([]byte, func()) {
+	if txi.getAppender == nil {
+		rawBytes, err := txi.store.Get(key)
+		if err != nil {
+			panic(err)
+		}
+		return rawBytes, func() {}
+	}
+
+	buf := txi.getReadBuffer()
+	rawBytes, err := txi.getAppender.GetAppend(key, (*buf)[:0])
+	if err != nil {
+		txi.putReadBuffer(buf)
+		panic(err)
+	}
+	if rawBytes == nil {
+		txi.putReadBuffer(buf)
+		return nil, func() {}
+	}
+	return rawBytes, func() {
+		*buf = rawBytes
+		txi.putReadBuffer(buf)
+	}
+}
+
+func (txi *TxIndex) getReadBuffer() *[]byte {
+	buf, _ := txi.readPool.Get().(*[]byte)
+	if buf == nil {
+		buf = new([]byte)
+	}
+	return buf
+}
+
+func (txi *TxIndex) putReadBuffer(buf *[]byte) {
+	if cap(*buf) == 0 || cap(*buf) > maxPooledReadBufferBytes {
+		return
+	}
+	*buf = (*buf)[:0]
+	txi.readPool.Put(buf)
 }
 
 // Index indexes transactions using the given list of events. Each key
