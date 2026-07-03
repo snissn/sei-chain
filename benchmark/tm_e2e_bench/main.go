@@ -425,11 +425,6 @@ func runBackendWithProfiles(ctx context.Context, opts options, backend string) (
 			runErr = err
 		}
 	}
-	if artifacts != nil && artifacts.HeapProfile != "" {
-		if err := writeHeapProfile(artifacts.HeapProfile); err != nil && runErr == nil {
-			runErr = err
-		}
-	}
 	if runErr != nil {
 		return benchResult{}, runErr
 	}
@@ -796,6 +791,11 @@ func runBackend(ctx context.Context, opts options, backend string, artifacts *pr
 		result.ReadP99Millis = percentileMillis(rr.latency, 99)
 		result.ReadP999Millis = percentileMillisFloat(rr.latency, 99.9)
 		result.ReadMaxMillis = durationMillis(rr.latency[len(rr.latency)-1])
+	}
+	if artifacts != nil && artifacts.HeapProfile != "" {
+		if err := writeHeapProfile(artifacts.HeapProfile); err != nil {
+			return benchResult{}, err
+		}
 	}
 	return result, nil
 }

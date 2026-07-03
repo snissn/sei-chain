@@ -55,8 +55,8 @@ Primary outputs:
 - `<out>/summary.txt`: compact metrics and backend ratios.
 - `<profile-dir>/<backend>.cpu.pprof`: per-backend CPU profile when
   `-profile-dir` is set.
-- `<profile-dir>/<backend>.heap.pprof`: per-backend heap profile when
-  `-profile-dir` is set.
+- `<profile-dir>/<backend>.heap.pprof`: per-backend heap profile captured before
+  backend node shutdown when `-profile-dir` is set.
 
 Each JSON result includes a `phase_timings` object with backend startup, first
 height wait, load, settle, commit wait, block-stat collection, tx-hash
@@ -64,10 +64,11 @@ collection, tx-index readiness, read delay, read phase, and data-size walk
 timings. The same phase values are repeated in `summary.txt` with
 `phase_*_s` keys for simple diffing.
 
-When `-profile-dir` is set, CPU profiling is active for the full backend run.
-That makes the profile representative of the measured backend envelope, but it
-also means profile overhead is included in the timing fields. Compare profile
-runs against profile runs, and use `pprof -diff_base` for before/after claims:
+When `-profile-dir` is set, CPU profiling is active for the full backend run and
+heap profiling is captured before backend node shutdown. That makes the profile
+artifacts representative of the measured backend envelope, but it also means
+profile overhead is included in the timing fields. Compare profile runs against
+profile runs, and use `pprof -diff_base` for before/after claims:
 
 ```bash
 go tool pprof -top \
